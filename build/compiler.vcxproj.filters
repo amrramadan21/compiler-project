@@ -1,0 +1,33 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\Users\amrra\Desktop\Projects\compilers Project\compiler from scratch\main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\amrra\Desktop\Projects\compilers Project\compiler from scratch\scanner.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\amrra\Desktop\Projects\compilers Project\compiler from scratch\parser.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="C:\Users\amrra\Desktop\Projects\compilers Project\compiler from scratch\scanner.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\amrra\Desktop\Projects\compilers Project\compiler from scratch\parser.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\amrra\Desktop\Projects\compilers Project\compiler from scratch\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{34A20B11-1223-371E-8D33-E7B795EA806B}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{56EFB224-C4D9-314F-B9CA-66C4966A9CD2}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

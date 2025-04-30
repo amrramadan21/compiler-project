@@ -1,0 +1,10 @@
+^C:\USERS\AMRRA\DESKTOP\PROJECTS\COMPILERS PROJECT\COMPILER FROM SCRATCH\CMAKELISTS.TXT
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" "-SC:/Users/amrra/Desktop/Projects/compilers Project/compiler from scratch" "-BC:/Users/amrra/Desktop/Projects/compilers Project/compiler from scratch/build" --check-stamp-file "C:/Users/amrra/Desktop/Projects/compilers Project/compiler from scratch/build/CMakeFiles/generate.stamp"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

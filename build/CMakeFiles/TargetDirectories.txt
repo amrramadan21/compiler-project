@@ -1,0 +1,4 @@
+C:/Users/amrra/Desktop/Projects/compilers Project/compiler from scratch/build/CMakeFiles/compiler.dir
+C:/Users/amrra/Desktop/Projects/compilers Project/compiler from scratch/build/CMakeFiles/test_scanner.dir
+C:/Users/amrra/Desktop/Projects/compilers Project/compiler from scratch/build/CMakeFiles/ALL_BUILD.dir
+C:/Users/amrra/Desktop/Projects/compilers Project/compiler from scratch/build/CMakeFiles/ZERO_CHECK.dir

@@ -1,0 +1,35 @@
+Include "mylib.h"
+
+// This is a comment
+/* This is a 
+   multi-line comment */
+
+IMw x = 5;
+SIMw y = -10;
+Chj c = 'a';
+Series arr[10];
+IMwf f = 3.14;
+SIMwf g = -2.718;
+
+NOReturn main() {
+    IMw test = 42;
+    Chj str = "Hello, World!";
+    
+    REPEATWHEN (x > 0) {
+        x = x - 1;
+        LOLI (y < 10) {
+            y = y + 1;
+        }
+    }
+    
+    REITERATE {
+        test = test * 2;
+        OUTLOOP WHEN (test > 100);
+    }
+    
+    Point p;
+    p->x = 10;
+    p->y = 20;
+    
+    TURNBACK 0;
+} 

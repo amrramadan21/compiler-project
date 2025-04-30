@@ -1,0 +1,125 @@
+// Test file for language features
+
+// Types and variables
+int x = 42;
+signed int y = -100;
+char c = 'A';
+string s = "Hello World";
+float f = 3.14;
+signed float sf = -2.718;
+void func() {
+    // Function body
+}
+
+// Conditional statements
+if_true (x > 0) {
+    turnback x;
+} otherwise {
+    turnback y;
+}
+
+// Loops
+repeatwhen (x < 100) {
+    x = x + 1;
+}
+
+reiterate (x > 0) {
+    x = x / 2;
+}
+
+// Break statement
+outloop;
+
+// Return statement
+turnback x;
+
+// Struct (Loli) declaration
+loli Point {
+    int x;
+    int y;
+}
+
+// Access operator
+Point p;
+p->x = 10;
+p->y = 20;
+
+// Arithmetic operations
+int result = (x + y) * (f / sf);
+bool flag = (x == y) || (x != y);
+bool notFlag = !flag;
+
+// Logical operators
+if_true (x > 0 && y < 0) {
+    // ...
+}
+
+if_true (x > 0 || y < 0) {
+    // ...
+}
+
+if_true (!(x == 0)) {
+    // ...
+}
+
+// Relational operators
+if_true (x == y) {
+    // ...
+}
+
+if_true (x != y) {
+    // ...
+}
+
+if_true (x < y) {
+    // ...
+}
+
+if_true (x > y) {
+    // ...
+}
+
+if_true (x <= y) {
+    // ...
+}
+
+if_true (x >= y) {
+    // ...
+}
+
+// Comments
+// This is a single line comment
+
+/*
+This is a
+multi-line
+comment
+*/
+
+// Include directive
+include "math.h";
+
+// Test file for compiler
+function main() {
+    int x = 10;
+    float y = 3.14;
+    string name = "test";
+    
+    if_true (x > 5) {
+        repeatwhen (y < 10) {
+            y = y + 1;
+            reiterate (y < 5) {
+                turnback y;
+            }
+        }
+    } otherwise {
+        outloop;
+    }
+    
+    loli Point {
+        int x;
+        float y;
+    }
+    
+    include "math.h";
+} 
