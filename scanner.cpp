@@ -3,34 +3,32 @@
 #include <cctype>
 #include <unordered_map>
 #include <sstream>
+#include <algorithm>
 
 // Keyword mapping
 static const std::unordered_map<std::string, TokenType> keywords = {
-    {"if", TokenType::CONDITION},
-    {"else", TokenType::OTHERWISE},
-    {"int", TokenType::INTEGER},
-    {"signed", TokenType::SINTEGER},
-    {"char", TokenType::CHARACTER},
-    {"string", TokenType::STRING},
-    {"float", TokenType::FLOAT},
-    {"void", TokenType::VOID},
-    {"while", TokenType::LOOP},
-    {"for", TokenType::LOOP},
-    {"return", TokenType::RETURN},
-    {"break", TokenType::BREAK},
-    {"struct", TokenType::STRUCT},
-    {"include", TokenType::INCLUDE},
-    {"true", TokenType::INTEGER},  // Using INTEGER for true (1)
-    {"false", TokenType::INTEGER}  // Using INTEGER for false (0)
+    {"IfTrue-Otherwise", TokenType::CONDITION},
+    {"Otherwise", TokenType::OTHERWISE},
+    {"Imw", TokenType::INTEGER},
+    {"SIMw", TokenType::SINTEGER},
+    {"Chj", TokenType::CHARACTER},
+    {"Series", TokenType::STRING},
+    {"IMwf", TokenType::FLOAT},
+    {"SIMwf", TokenType::SFLOAT},
+    {"NOReturn", TokenType::VOID},
+    {"RepeatWhen", TokenType::LOOP},
+    {"Reiterate", TokenType::LOOP},
+    {"Turnback", TokenType::RETURN},
+    {"OutLoop", TokenType::BREAK},
+    {"Loli", TokenType::STRUCT},
+    {"Include", TokenType::INCLUDE},
+    {"int", TokenType::TYPE}
 };
 
 Scanner::Scanner(const std::string& source) 
-    : source(source), current(0), start(0), line(1), column(0) {
-    // Initialize the scanner with the source code
-}
+    : source(source), current(0), start(0), line(1), column(0) {}
 
 Scanner::~Scanner() {
-    // Clean up any open files
     while (!fileStack.empty()) {
         if (fileStack.back().is_open()) {
             fileStack.back().close();
@@ -80,36 +78,22 @@ bool Scanner::isDigit(char c) {
 }
 
 bool Scanner::isAlpha(char c) {
-    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
 }
 
 bool Scanner::isAlphaNumeric(char c) {
-    return isAlpha(c) || isDigit(c) || c == '_';
+    return isAlpha(c) || isDigit(c);
 }
 
 void Scanner::skipWhitespace() {
-    while (!isAtEnd() && (isspace(peek()) || peek() == '\t')) {
-        advance();
-    }
-}
-
-void Scanner::skipComment() {
-    char first = advance();
-    char second = advance();
-    
-    if (second == '@') {
-        // Multi-line comment
-        while (!isAtEnd() && !(peek() == '@' && peekNext() == '/')) {
+    while (!isAtEnd()) {
+        char c = peek();
+        if (c == ' ' || c == '\t' || c == '\r') {
             advance();
-        }
-        if (!isAtEnd()) {
-            advance(); // Consume @
-            advance(); // Consume /
-        }
-    } else if (second == '^') {
-        // Single-line comment
-        while (!isAtEnd() && peek() != '\n') {
+        } else if (c == '\n') {
             advance();
+        } else {
+            break;
         }
     }
 }
@@ -120,7 +104,19 @@ Token Scanner::scanIdentifier() {
     value += peek();
     advance();
 
-    while (!isAtEnd() && (isAlpha(peek()) || isDigit(peek()))) {
+    // Special handling for IfTrue-Otherwise
+    if (value == "I" && peek() == 'f' && peekNext() == 'T') {
+        while (!isAtEnd() && (isAlpha(peek()) || peek() == '-')) {
+            value += peek();
+            advance();
+        }
+        if (value == "IfTrue-Otherwise") {
+            return Token(TokenType::CONDITION, value, line, startColumn);
+        }
+    }
+
+    // Regular identifier scanning
+    while (!isAtEnd() && (isAlphaNumeric(peek()) || peek() == '-')) {
         value += peek();
         advance();
     }
@@ -131,6 +127,12 @@ Token Scanner::scanIdentifier() {
         return Token(it->second, value, line, startColumn);
     }
 
+    // Check if identifier starts with a digit
+    if (isDigit(value[0])) {
+        error("Invalid identifier: cannot start with a digit", line, startColumn);
+        return Token(TokenType::ERROR, value, line, startColumn);
+    }
+
     return Token(TokenType::IDENTIFIER, value, line, startColumn);
 }
 
@@ -138,31 +140,81 @@ Token Scanner::scanNumber() {
     int startColumn = column;
     std::string value;
     bool hasDecimal = false;
+    bool isFloat = false;
+    bool hasF = false;
 
-    while (!isAtEnd() && (isdigit(peek()) || peek() == '.')) {
-        if (peek() == '.') {
-            if (hasDecimal) {
-                error("Invalid number format", line, column);
-                return Token(TokenType::ERROR, "", line, startColumn);
-            }
-            hasDecimal = true;
+    // Handle sign if present
+    if (peek() == '+' || peek() == '-') {
+        value += peek();
+        advance();
+    }
+
+    // Scan digits before decimal point
+    while (!isAtEnd() && isDigit(peek())) {
+        value += peek();
+        advance();
+    }
+
+    // Handle decimal point and following digits
+    if (peek() == '.') {
+        hasDecimal = true;
+        isFloat = true;
+        value += peek();
+        advance();
+
+        while (!isAtEnd() && isDigit(peek())) {
+            value += peek();
+            advance();
+        }
+    }
+
+    // Handle 'f' or 'F' suffix for explicit float literals
+    if (peek() == 'f' || peek() == 'F') {
+        hasF = true;
+        isFloat = true;
+        advance();
+    }
+
+    // Validate number format
+    if (value.back() == '.') {
+        error("Invalid number format: ends with decimal point", line, column);
+        return Token(TokenType::ERROR, "", line, startColumn);
+    }
+
+    // Return appropriate token type
+    if (isFloat) {
+        return Token(TokenType::FLOAT, value, line, startColumn);
+    } else {
+        return Token(TokenType::INTEGER, value, line, startColumn);
+    }
+}
+
+Token Scanner::scanString() {
+    int startColumn = column;
+    std::string value;
+    advance(); // Consume opening quote
+
+    while (!isAtEnd() && peek() != '"') {
+        if (peek() == '\n') {
+            error("Unterminated string literal", line, column);
+            return Token(TokenType::ERROR, "", line, startColumn);
         }
         value += peek();
         advance();
     }
 
-    // If the number ends with a decimal point, it's invalid
-    if (value.back() == '.') {
-        error("Invalid number format", line, column);
+    if (isAtEnd()) {
+        error("Unterminated string literal", line, column);
         return Token(TokenType::ERROR, "", line, startColumn);
     }
 
-    return Token(hasDecimal ? TokenType::FLOAT : TokenType::INTEGER, value, line, startColumn);
+    advance(); // Consume closing quote
+    return Token(TokenType::STRING, value, line, startColumn);
 }
 
 Token Scanner::scanCharacter() {
     int startColumn = column;
-    advance(); // Consume the opening quote
+    advance(); // Consume opening quote
 
     if (isAtEnd()) {
         error("Unterminated character literal", line, column);
@@ -177,109 +229,192 @@ Token Scanner::scanCharacter() {
         return Token(TokenType::ERROR, "", line, startColumn);
     }
 
-    advance(); // Consume the closing quote
+    advance(); // Consume closing quote
     return Token(TokenType::CHARACTER, value, line, startColumn);
 }
 
-Token Scanner::scanString() {
+Token Scanner::scanComment() {
     int startColumn = column;
-    std::string value;
-    advance(); // Consume the opening quote
-
-    while (!isAtEnd() && peek() != '"') {
-        if (peek() == '\n') {
-            error("Unterminated string", line, column);
-            return Token(TokenType::ERROR, "", line, startColumn);
+    char first = advance(); // Consume /
+    char second = peek();
+    
+    if (second == '@') {
+        advance(); // Consume @
+        Token startToken(TokenType::COMMENT_START, "/@", line, startColumn);
+        std::string content;
+        int contentLine = line;
+        int contentColumn = column;
+        
+        while (!isAtEnd() && !(peek() == '@' && peekNext() == '/')) {
+            content += peek();
+            advance();
         }
-        value += peek();
-        advance();
-    }
-
-    if (isAtEnd()) {
-        error("Unterminated string", line, column);
+        
+        if (!isAtEnd()) {
+            advance(); // Consume @
+            advance(); // Consume /
+            // Return comment content token
+            return Token(TokenType::COMMENT_CONTENT, content, contentLine, contentColumn);
+        }
+        
+        error("Unterminated multi-line comment", line, column);
         return Token(TokenType::ERROR, "", line, startColumn);
+    } 
+    else if (second == '^') {
+        advance(); // Consume ^
+        std::string content;
+        int contentLine = line;
+        int contentColumn = column;
+        
+        while (!isAtEnd() && peek() != '\n') {
+            content += peek();
+            advance();
+        }
+        
+        // Return single-line comment content token
+        return Token(TokenType::COMMENT_CONTENT, content, contentLine, contentColumn);
     }
-
-    advance(); // Consume the closing quote
-    return Token(TokenType::STRING, value, line, startColumn);
+    
+    return Token(TokenType::DIVIDE, "/", line, startColumn);
 }
 
 Token Scanner::scanOperator() {
     int startColumn = column;
-    char first = peek();
+    char c = peek();
+    std::string op;
+    op += c;
     advance();
-    char second = peek();
 
-    // Check for two-character operators
-    if (!isAtEnd()) {
-        std::string twoChar(1, first);
-        twoChar += second;
+    switch (c) {
+        case '=':
+            if (peek() == '=') {
+                op += advance();
+                return Token(TokenType::EQUAL, op, line, startColumn);
+            }
+            return Token(TokenType::ASSIGN, op, line, startColumn);
         
-        if (twoChar == "&&") {
-            advance();
-            return Token(TokenType::AND, twoChar, line, startColumn);
-        } else if (twoChar == "||") {
-            advance();
-            return Token(TokenType::OR, twoChar, line, startColumn);
-        } else if (twoChar == "==") {
-            advance();
-            return Token(TokenType::EQUAL, twoChar, line, startColumn);
-        } else if (twoChar == "!=") {
-            advance();
-            return Token(TokenType::NOT_EQUAL, twoChar, line, startColumn);
-        } else if (twoChar == "<=") {
-            advance();
-            return Token(TokenType::LESS_EQUAL, twoChar, line, startColumn);
-        } else if (twoChar == ">=") {
-            advance();
-            return Token(TokenType::GREATER_EQUAL, twoChar, line, startColumn);
-        }
-    }
-
-    // Single character operators
-    switch (first) {
-        case '+': return Token(TokenType::PLUS, std::string(1, first), line, startColumn);
-        case '-': return Token(TokenType::MINUS, std::string(1, first), line, startColumn);
-        case '*': return Token(TokenType::MULTIPLY, std::string(1, first), line, startColumn);
-        case '/': return Token(TokenType::DIVIDE, std::string(1, first), line, startColumn);
-        case '=': return Token(TokenType::ASSIGN, std::string(1, first), line, startColumn);
-        case '<': return Token(TokenType::LESS, std::string(1, first), line, startColumn);
-        case '>': return Token(TokenType::GREATER, std::string(1, first), line, startColumn);
-        case '!': return Token(TokenType::NOT, std::string(1, first), line, startColumn);
-        case '(': return Token(TokenType::LEFT_PAREN, std::string(1, first), line, startColumn);
-        case ')': return Token(TokenType::RIGHT_PAREN, std::string(1, first), line, startColumn);
-        case '{': return Token(TokenType::LEFT_BRACE, std::string(1, first), line, startColumn);
-        case '}': return Token(TokenType::RIGHT_BRACE, std::string(1, first), line, startColumn);
-        case ';': return Token(TokenType::SEMICOLON, std::string(1, first), line, startColumn);
-        case ',': return Token(TokenType::COMMA, std::string(1, first), line, startColumn);
-        case '.': return Token(TokenType::DOT, std::string(1, first), line, startColumn);
-        case '->': return Token(TokenType::ARROW, "->", line, startColumn);
+        case '!':
+            if (peek() == '=') {
+                op += advance();
+                return Token(TokenType::NOT_EQUAL, op, line, startColumn);
+            }
+            error("Invalid operator: single '!'", line, startColumn);
+            return Token(TokenType::ERROR, op, line, startColumn);
+        
+        case '<':
+            if (peek() == '=') {
+                op += advance();
+                return Token(TokenType::LESS_EQUAL, op, line, startColumn);
+            }
+            return Token(TokenType::LESS, op, line, startColumn);
+        
+        case '>':
+            if (peek() == '=') {
+                op += advance();
+                return Token(TokenType::GREATER_EQUAL, op, line, startColumn);
+            }
+            return Token(TokenType::GREATER, op, line, startColumn);
+        
+        case '&':
+            if (peek() == '&') {
+                op += advance();
+                return Token(TokenType::AND, op, line, startColumn);
+            }
+            error("Invalid operator: single '&'", line, startColumn);
+            return Token(TokenType::ERROR, op, line, startColumn);
+        
+        case '|':
+            if (peek() == '|') {
+                op += advance();
+                return Token(TokenType::OR, op, line, startColumn);
+            }
+            error("Invalid operator: single '|'", line, startColumn);
+            return Token(TokenType::ERROR, op, line, startColumn);
+        
+        case '-':
+            if (peek() == '>') {
+                op += advance();
+                return Token(TokenType::ACCESS, op, line, startColumn);
+            }
+            return Token(TokenType::MINUS, op, line, startColumn);
+        
+        case '~':
+            return Token(TokenType::NOT, op, line, startColumn);
+        
+        case '+':
+            return Token(TokenType::PLUS, op, line, startColumn);
+        
+        case '*':
+            return Token(TokenType::MULTIPLY, op, line, startColumn);
+        
         default:
-            reportError("Unknown operator: " + std::string(1, first));
-            return Token(TokenType::ERROR, std::string(1, first), line, startColumn);
+            error("Invalid operator", line, startColumn);
+            return Token(TokenType::ERROR, op, line, startColumn);
     }
 }
 
 void Scanner::handleInclude(const std::string& filename) {
-    std::ifstream includeFile(filename);
-    if (!includeFile.is_open()) {
-        reportError("Could not open include file: " + filename);
-        return;
-    }
-
     // Save current state
-    fileStack.push_back(std::move(includeFile));
+    fileStack.push_back(std::ifstream());
     filenameStack.push_back(filename);
     lineStack.push_back(line);
     columnStack.push_back(column);
-
-    // Read the include file
+    
+    // Open the include file
+    fileStack.back().open(filename);
+    if (!fileStack.back().is_open()) {
+        error("Could not open include file: " + filename, line, column);
+        fileStack.pop_back();
+        filenameStack.pop_back();
+        lineStack.pop_back();
+        columnStack.pop_back();
+        return;
+    }
+    
+    // Read the entire file into a string
     std::stringstream buffer;
-    buffer << includeFile.rdbuf();
-    source = buffer.str() + source.substr(current);
-    current = 0;
-    line = 1;
-    column = 0;
+    buffer << fileStack.back().rdbuf();
+    std::string includeContent = buffer.str();
+    
+    // Insert the include file content at the current position
+    source.insert(current, includeContent);
+    
+    // Close the file since we've read it
+    fileStack.back().close();
+    
+    // Update line tracking for the included content
+    size_t newlines = std::count(includeContent.begin(), includeContent.end(), '\n');
+    line += newlines;
+}
+
+void Scanner::processIncludeDirective() {
+    // Skip the "Include" keyword
+    while (!isAtEnd() && peek() != '"') {
+        advance();
+    }
+    
+    if (isAtEnd() || peek() != '"') {
+        error("Expected filename in quotes after Include", line, column);
+        return;
+    }
+    
+    advance(); // Skip opening quote
+    std::string filename;
+    
+    while (!isAtEnd() && peek() != '"') {
+        filename += peek();
+        advance();
+    }
+    
+    if (isAtEnd() || peek() != '"') {
+        error("Unterminated filename in Include directive", line, column);
+        return;
+    }
+    
+    advance(); // Skip closing quote
+    
+    // Process the include file
+    handleInclude(filename);
 }
 
 Token Scanner::getNextToken() {
@@ -289,56 +424,105 @@ Token Scanner::getNextToken() {
         return Token(TokenType::END_OF_FILE, "", line, column);
     }
     
+    start = current;
     char c = peek();
-    int startColumn = column;
+    
+    // Handle identifiers and keywords
+    if (isAlpha(c)) {
+        return scanIdentifier();
+    }
+    
+    // Handle numbers
+    if (isDigit(c) || (c == '-' && isDigit(peekNext()))) {
+        return scanNumber();
+    }
+    
+    // Handle string literals
+    if (c == '"') {
+        return scanString();
+    }
+    
+    // Handle character literals
+    if (c == '\'') {
+        return scanCharacter();
+    }
     
     // Handle comments
     if (c == '/') {
         char next = peekNext();
         if (next == '@' || next == '^') {
-            skipComment();
-            return getNextToken(); // Skip to next token after comment
+            return scanComment();
         }
-    }
-    
-    // Handle parentheses
-    if (c == '(') {
         advance();
-        return Token(TokenType::LEFT_PAREN, "(", line, startColumn);
-    }
-    if (c == ')') {
-        advance();
-        return Token(TokenType::RIGHT_PAREN, ")", line, startColumn);
-    }
-    
-    // Handle numbers
-    if (isDigit(c)) {
-        return scanNumber();
-    }
-    
-    // Handle identifiers and keywords
-    if (isAlpha(c) || c == '_') {
-        return scanIdentifier();
-    }
-    
-    // Handle strings and characters
-    if (c == '"') {
-        return scanString();
-    }
-    if (c == '\'') {
-        return scanCharacter();
+        return Token(TokenType::DIVIDE, "/", line, column-1);
     }
     
     // Handle operators and delimiters
-    if (ispunct(c)) {
-        return scanOperator();
+    advance();
+    switch (c) {
+        case '(': return Token(TokenType::LEFT_PAREN, "(", line, column-1);
+        case ')': return Token(TokenType::RIGHT_PAREN, ")", line, column-1);
+        case '{': return Token(TokenType::LEFT_BRACE, "{", line, column-1);
+        case '}': return Token(TokenType::RIGHT_BRACE, "}", line, column-1);
+        case '[': return Token(TokenType::LEFT_BRACKET, "[", line, column-1);
+        case ']': return Token(TokenType::RIGHT_BRACKET, "]", line, column-1);
+        case ';': return Token(TokenType::SEMICOLON, ";", line, column-1);
+        case ',': return Token(TokenType::COMMA, ",", line, column-1);
+        case '+': return Token(TokenType::PLUS, "+", line, column-1);
+        case '-': 
+            if (peek() == '>') {
+                advance();
+                return Token(TokenType::ACCESS, "->", line, column-2);
+            }
+            return Token(TokenType::MINUS, "-", line, column-1);
+        case '*': return Token(TokenType::MULTIPLY, "*", line, column-1);
+        case '=':
+            if (peek() == '=') {
+                advance();
+                return Token(TokenType::EQUAL, "==", line, column-2);
+            }
+            return Token(TokenType::ASSIGN, "=", line, column-1);
+        case '<':
+            if (peek() == '=') {
+                advance();
+                return Token(TokenType::LESS_EQUAL, "<=", line, column-2);
+            }
+            return Token(TokenType::LESS, "<", line, column-1);
+        case '>':
+            if (peek() == '=') {
+                advance();
+                return Token(TokenType::GREATER_EQUAL, ">=", line, column-2);
+            }
+            return Token(TokenType::GREATER, ">", line, column-1);
+        case '!':
+            if (peek() == '=') {
+                advance();
+                return Token(TokenType::NOT_EQUAL, "!=", line, column-2);
+            }
+            error("Invalid operator: single '!'", line, column-1);
+            return Token(TokenType::ERROR, "!", line, column-1);
+        case '&':
+            if (peek() == '&') {
+                advance();
+                return Token(TokenType::AND, "&&", line, column-2);
+            }
+            error("Invalid operator: single '&'", line, column-1);
+            return Token(TokenType::ERROR, "&", line, column-1);
+        case '|':
+            if (peek() == '|') {
+                advance();
+                return Token(TokenType::OR, "||", line, column-2);
+            }
+            error("Invalid operator: single '|'", line, column-1);
+            return Token(TokenType::ERROR, "|", line, column-1);
+        case '~': return Token(TokenType::NOT, "~", line, column-1);
     }
     
-    // Invalid character
-    std::string invalid(1, c);
-    reportError(invalid + " Invalid character");
-    advance();
-    return Token(TokenType::ERROR, invalid, line, column);
+    // If we get here, we have an invalid character
+    std::string errorMsg = "Unexpected character: ";
+    errorMsg += c;
+    error(errorMsg, line, column-1);
+    return Token(TokenType::ERROR, std::string(1, c), line, column-1);
 }
 
 bool Scanner::hasError() const {
@@ -361,6 +545,26 @@ void Scanner::reportError(const std::string& message) {
 
 void Scanner::error(const std::string& message, int line, int column) {
     std::stringstream ss;
-    ss << "Line: " << line << " Error in Token Text: " << message;
+    ss << "Line " << line << ", Column " << column << ": " << message;
     errors.push_back(ss.str());
+}
+
+void Scanner::ungetToken() {
+    if (current > 0) {
+        current--;
+        // Restore the previous line and column if we're moving back
+        if (source[current] == '\n') {
+            line--;
+            // We need to count the characters in the previous line to restore column
+            size_t lineStart = source.rfind('\n', current - 1);
+            if (lineStart == std::string::npos) {
+                lineStart = 0;
+            } else {
+                lineStart++;
+            }
+            column = current - lineStart;
+        } else {
+            column--;
+        }
+    }
 } 

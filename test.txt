@@ -1,0 +1,10 @@
+/@ This is an included file @/
+
+Imw globalVar;
+
+NOReturn helperFunction(Imw param) {
+    IfTrue(param > 0) {
+        Turnback param;
+    }
+    Turnback 0;
+} 

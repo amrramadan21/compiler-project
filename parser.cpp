@@ -82,469 +82,433 @@ public:
         : ASTNode(NodeType::INCLUDE_STMT, line, col), path(p) {}
 };
 
-Parser::Parser(const std::vector<Token>& tokens) 
-    : tokens(tokens), currentIndex(0),
-      current(TokenType::UNKNOWN, "", 0, 0),
-      previousToken(TokenType::UNKNOWN, "", 0, 0) {
-    if (!tokens.empty()) {
-        current = tokens[0];
-    }
-}
-
-Token Parser::advance() {
-    previousToken = current;
-    if (!isAtEnd()) {
-        currentIndex++;
-        current = tokens[currentIndex];
-    }
-    return previousToken;
-}
-
-Token Parser::peek() const {
-    return current;
-}
-
-Token Parser::previous() const {
-    return previousToken;
-}
-
-bool Parser::match(TokenType type) {
-    if (check(type)) {
-        advance();
-        return true;
-    }
-    return false;
-}
-
-bool Parser::check(TokenType type) const {
-    if (isAtEnd()) return false;
-    return current.type == type;
-}
-
-Token Parser::consume(TokenType type, const std::string& message) {
-    if (check(type)) return advance();
-    throw error(current, message);
-}
-
-Parser::ParseError Parser::error(const Token& token, const std::string& message) {
-    std::stringstream ss;
-    ss << "[Line " << token.line << ", Column " << token.column << "] Error: " << message;
-    errorMessage = ss.str();
-    return ParseError{};
-}
-
-void Parser::reportError(const std::string& message) {
-    errorMessage = message;
-}
-
-void Parser::reportMatch(const std::string& rule) {
-    matchedRules.push_back(rule);
-}
-
-void Parser::synchronize() {
+Parser::Parser(const std::string& source) : scanner(source), errorCount(0) {
     advance();
-    while (!isAtEnd()) {
-        if (previousToken.type == TokenType::SEMICOLON) return;
-        
-        switch (current.type) {
-            case TokenType::CONDITION:
-            case TokenType::LOOP:
-            case TokenType::RETURN:
-            case TokenType::BREAK:
-            case TokenType::INTEGER:
-            case TokenType::FLOAT:
-            case TokenType::STRING:
-            case TokenType::CHARACTER:
-                return;
-            default:
-                advance();
+}
+
+void Parser::advance() {
+    currentToken = scanner.getNextToken();
+}
+
+void Parser::match(TokenType expected) {
+    if (currentToken.type == expected) {
+        std::cout << "Line #: " << currentToken.line << " Matched Rule Used: " 
+                  << static_cast<int>(currentToken.type) << std::endl;
+        advance();
+    } else {
+        std::stringstream ss;
+        ss << "Line #: " << currentToken.line << " Not Matched";
+        error(ss.str());
+    }
+}
+
+void Parser::error(const std::string& message) {
+    std::stringstream ss;
+    ss << "Line #: " << currentToken.line << " Error: " << message;
+    errors.push_back(ss.str());
+    errorCount++;
+}
+
+void Parser::parse() {
+    program();
+    std::cout << "Total NO of errors: " << errorCount << std::endl;
+}
+
+// Grammar rule implementations
+void Parser::program() {
+    // program → declaration-list | comment | include_command
+    while (currentToken.type != TokenType::END_OF_FILE) {
+        if (currentToken.type == TokenType::COMMENT_START) {
+            comment();
+        } else if (currentToken.type == TokenType::INCLUDE) {
+            includeCommand();
+        } else {
+            declarationList();
         }
     }
 }
 
-bool Parser::isAtEnd() const {
-    return currentIndex >= tokens.size();
+void Parser::declarationList() {
+    // declaration-list → declaration-list declaration | declaration
+    declaration();
+    while (currentToken.type != TokenType::END_OF_FILE && 
+           currentToken.type != TokenType::RIGHT_BRACE) {
+        declaration();
+    }
 }
 
-bool Parser::isUnaryOperator(TokenType type) const {
-    return type == TokenType::NOT || type == TokenType::MINUS;
+void Parser::declaration() {
+    // declaration → var-declaration | fun-declaration
+    if (isTypeSpecifier(currentToken.type)) {
+        Token typeToken = currentToken;
+        advance(); // Consume type specifier
+        
+        if (currentToken.type != TokenType::IDENTIFIER) {
+            error("Expected identifier after type specifier");
+            return;
+        }
+        
+        Token nameToken = currentToken;
+        advance(); // Consume identifier
+        
+        if (currentToken.type == TokenType::LEFT_PAREN) {
+            // Function declaration
+            match(TokenType::LEFT_PAREN);
+            params();
+            match(TokenType::RIGHT_PAREN);
+            compoundStmt();
+        } else if (currentToken.type == TokenType::ASSIGN) {
+            // Variable declaration with initialization
+            match(TokenType::ASSIGN);
+            expression();
+            match(TokenType::SEMICOLON);
+        } else {
+            // Simple variable declaration
+            match(TokenType::SEMICOLON);
+        }
+    } else {
+        error("Expected type specifier (Imw, SIMw, IMwf, SIMwf, Chj, Series, or NOReturn)");
+        advance();
+    }
 }
 
-bool Parser::isBinaryOperator(TokenType type) const {
-    return type == TokenType::PLUS || type == TokenType::MINUS ||
-           type == TokenType::MULTIPLY || type == TokenType::DIVIDE ||
-           type == TokenType::EQUAL || type == TokenType::NOT_EQUAL ||
-           type == TokenType::LESS || type == TokenType::LESS_EQUAL ||
+void Parser::varDeclaration() {
+    // var-declaration → type-specifier ID ;
+    typeSpecifier();
+    if (currentToken.type == TokenType::IDENTIFIER) {
+        match(TokenType::IDENTIFIER);
+        match(TokenType::SEMICOLON);
+    } else {
+        error("Expected identifier");
+        advance();
+    }
+}
+
+void Parser::funDeclaration() {
+    // fun-declaration → type-specifier ID ( params ) compound-stmt
+    typeSpecifier();
+    if (currentToken.type == TokenType::IDENTIFIER) {
+        match(TokenType::IDENTIFIER);
+        match(TokenType::LEFT_PAREN);
+        params();
+        match(TokenType::RIGHT_PAREN);
+        compoundStmt();
+    } else {
+        error("Expected function name");
+        advance();
+    }
+}
+
+void Parser::typeSpecifier() {
+    // type-specifier → Imw | SIMw | Chj | Series | IMwf | SIMwf | NOReturn
+    if (isTypeSpecifier(currentToken.type)) {
+        std::cout << "Matched type specifier: " << currentToken.value << std::endl;
+        advance();
+    } else {
+        error("Invalid type specifier. Expected one of: Imw, SIMw, IMwf, SIMwf, Chj, Series, or NOReturn");
+        advance();
+    }
+}
+
+bool Parser::isTypeSpecifier(TokenType type) {
+    switch (type) {
+        case TokenType::INTEGER:    // Imw
+        case TokenType::SINTEGER:   // SIMw
+        case TokenType::CHARACTER:  // Chj
+        case TokenType::STRING:     // Series
+        case TokenType::FLOAT:      // IMwf
+        case TokenType::SFLOAT:     // SIMwf
+        case TokenType::VOID:       // NOReturn
+            return true;
+        default:
+            return false;
+    }
+}
+
+void Parser::params() {
+    // params → param-list | NOReturn | ε
+    if (currentToken.type == TokenType::VOID) {
+        match(TokenType::VOID);
+    } else if (isTypeSpecifier(currentToken.type)) {
+        paramList();
+    }
+}
+
+void Parser::paramList() {
+    // param-list → param-list , param | param
+    param();
+    while (currentToken.type == TokenType::COMMA) {
+        match(TokenType::COMMA);
+        param();
+    }
+}
+
+void Parser::param() {
+    // param → type-specifier ID
+    typeSpecifier();
+    if (currentToken.type == TokenType::IDENTIFIER) {
+        match(TokenType::IDENTIFIER);
+    } else {
+        error("Expected parameter name");
+        advance();
+    }
+}
+
+void Parser::compoundStmt() {
+    // compound-stmt → { local-declarations statement-list }
+    match(TokenType::LEFT_BRACE);
+    localDeclarations();
+    statementList();
+    match(TokenType::RIGHT_BRACE);
+}
+
+void Parser::localDeclarations() {
+    // local-declarations → local-declarations var-declaration | ε
+    while (isTypeSpecifier(currentToken.type)) {
+        varDeclaration();
+    }
+}
+
+void Parser::statementList() {
+    // statement-list → statement-list statement | ε
+    while (currentToken.type != TokenType::RIGHT_BRACE && 
+           currentToken.type != TokenType::END_OF_FILE) {
+        statement();
+    }
+}
+
+void Parser::statement() {
+    // statement → expression-stmt | compound-stmt | selection-stmt | iteration-stmt | jump-stmt
+    switch (currentToken.type) {
+        case TokenType::CONDITION:
+            selectionStmt();
+            break;
+        case TokenType::LOOP:
+            iterationStmt();
+            break;
+        case TokenType::RETURN:
+        case TokenType::BREAK:
+            jumpStmt();
+            break;
+        case TokenType::LEFT_BRACE:
+            compoundStmt();
+            break;
+        default:
+            expressionStmt();
+            break;
+    }
+}
+
+void Parser::expressionStmt() {
+    // expression-stmt → expression ; | ;
+    if (currentToken.type != TokenType::SEMICOLON) {
+        expression();
+    }
+    match(TokenType::SEMICOLON);
+}
+
+void Parser::selectionStmt() {
+    // selection-stmt → IfTrue ( expression ) statement | IfTrue ( expression ) statement Otherwise statement
+    match(TokenType::CONDITION);
+    match(TokenType::LEFT_PAREN);
+    expression();
+    match(TokenType::RIGHT_PAREN);
+    statement();
+    if (currentToken.type == TokenType::OTHERWISE) {
+        match(TokenType::OTHERWISE);
+        statement();
+    }
+}
+
+void Parser::iterationStmt() {
+    // iteration-stmt → RepeatWhen ( expression ) statement | Reiterate ( expression ; expression ; expression ) statement
+    match(TokenType::LOOP);
+    match(TokenType::LEFT_PAREN);
+    expression();
+    if (currentToken.type == TokenType::SEMICOLON) {
+        // Reiterate statement
+        match(TokenType::SEMICOLON);
+        expression();
+        match(TokenType::SEMICOLON);
+        expression();
+    }
+    match(TokenType::RIGHT_PAREN);
+    statement();
+}
+
+void Parser::jumpStmt() {
+    // jump-stmt → Turnback expression ; | Stop ;
+    if (currentToken.type == TokenType::RETURN) {
+        match(TokenType::RETURN);
+        if (currentToken.type != TokenType::SEMICOLON) {
+            expression();
+        }
+    } else if (currentToken.type == TokenType::BREAK) {
+        match(TokenType::BREAK);
+    }
+    match(TokenType::SEMICOLON);
+}
+
+void Parser::expression() {
+    // expression → id-assign = expression | simple-expression
+    if (currentToken.type == TokenType::IDENTIFIER) {
+        Token lookAhead = scanner.getNextToken();
+        scanner.ungetToken();
+        
+        if (lookAhead.type == TokenType::ASSIGN) {
+            idAssign();
+            match(TokenType::ASSIGN);
+            expression();
+        } else {
+            simpleExpression();
+        }
+    } else {
+        simpleExpression();
+    }
+}
+
+void Parser::idAssign() {
+    // id-assign → ID
+    match(TokenType::IDENTIFIER);
+}
+
+void Parser::simpleExpression() {
+    // simple-expression → additive-expression relop additive-expression | additive-expression
+    additiveExpression();
+    if (isRelop(currentToken.type)) {
+        advance();
+        additiveExpression();
+    }
+}
+
+bool Parser::isRelop(TokenType type) {
+    return type == TokenType::LESS_EQUAL || type == TokenType::LESS ||
            type == TokenType::GREATER || type == TokenType::GREATER_EQUAL ||
+           type == TokenType::EQUAL || type == TokenType::NOT_EQUAL ||
            type == TokenType::AND || type == TokenType::OR;
 }
 
-int Parser::getOperatorPrecedence(TokenType type) const {
-    switch (type) {
-        case TokenType::OR: return 1;
-        case TokenType::AND: return 2;
-        case TokenType::EQUAL:
-        case TokenType::NOT_EQUAL: return 3;
-        case TokenType::LESS:
-        case TokenType::LESS_EQUAL:
-        case TokenType::GREATER:
-        case TokenType::GREATER_EQUAL: return 4;
-        case TokenType::PLUS:
-        case TokenType::MINUS: return 5;
-        case TokenType::MULTIPLY:
-        case TokenType::DIVIDE: return 6;
-        default: return 0;
+void Parser::additiveExpression() {
+    // additive-expression → additive-expression addop term | term
+    term();
+    while (currentToken.type == TokenType::PLUS || 
+           currentToken.type == TokenType::MINUS) {
+        advance();
+        term();
     }
 }
 
-std::string Parser::tokenToString(TokenType type) const {
-    switch (type) {
-        case TokenType::INTEGER: return "INTEGER";
-        case TokenType::FLOAT: return "FLOAT";
-        case TokenType::STRING: return "STRING";
-        case TokenType::CHARACTER: return "CHARACTER";
-        case TokenType::CONDITION: return "CONDITION";
-        case TokenType::LOOP: return "LOOP";
-        case TokenType::RETURN: return "RETURN";
-        case TokenType::BREAK: return "BREAK";
-        case TokenType::IDENTIFIER: return "IDENTIFIER";
-        case TokenType::CONSTANT: return "CONSTANT";
-        case TokenType::SEMICOLON: return ";";
-        case TokenType::LEFT_BRACE: return "(";
-        case TokenType::RIGHT_BRACE: return ")";
-        case TokenType::LEFT_BRACKET: return "{";
-        case TokenType::RIGHT_BRACKET: return "}";
-        case TokenType::EQUAL: return "=";
-        case TokenType::NOT_EQUAL: return "!=";
-        case TokenType::LESS: return "<";
-        case TokenType::LESS_EQUAL: return "<=";
-        case TokenType::GREATER: return ">";
-        case TokenType::GREATER_EQUAL: return ">=";
-        case TokenType::PLUS: return "+";
-        case TokenType::MINUS: return "-";
-        case TokenType::MULTIPLY: return "*";
-        case TokenType::DIVIDE: return "/";
-        case TokenType::AND: return "&&";
-        case TokenType::OR: return "||";
-        case TokenType::NOT: return "!";
-        case TokenType::END_OF_FILE: return "EOF";
-        default: return "UNKNOWN";
+void Parser::term() {
+    // term → term mulop factor | factor
+    factor();
+    while (currentToken.type == TokenType::MULTIPLY || 
+           currentToken.type == TokenType::DIVIDE) {
+        advance();
+        factor();
     }
 }
 
-bool Parser::isTypeToken(TokenType type) const {
-    return type == TokenType::INTEGER ||
-           type == TokenType::FLOAT ||
-           type == TokenType::STRING ||
-           type == TokenType::CHARACTER;
-}
-
-bool Parser::isTypeSpecifier(TokenType type) const {
-    return isTypeToken(type);
-}
-
-bool Parser::isRelop(TokenType type) const {
-    return type == TokenType::EQUAL ||
-           type == TokenType::NOT_EQUAL ||
-           type == TokenType::LESS ||
-           type == TokenType::LESS_EQUAL ||
-           type == TokenType::GREATER ||
-           type == TokenType::GREATER_EQUAL;
-}
-
-bool Parser::isAddop(TokenType type) const {
-    return type == TokenType::PLUS ||
-           type == TokenType::MINUS;
-}
-
-bool Parser::isMulop(TokenType type) const {
-    return type == TokenType::MULTIPLY ||
-           type == TokenType::DIVIDE;
-}
-
-bool Parser::checkNext(TokenType type) const {
-    if (isAtEnd()) return false;
-    return tokens[currentIndex + 1].type == type;
-}
-
-std::unique_ptr<ASTNode> Parser::parse() {
-    try {
-        Token firstToken = peek();
-        auto program = std::make_unique<BlockNode>(firstToken.line, firstToken.column);
-        
-        while (!isAtEnd()) {
-            auto statement = parseStatement();
-            if (statement) {
-                program->statements.push_back(std::move(statement));
+void Parser::factor() {
+    // factor → ( expression ) | id-assign | call | num
+    Token lookAhead;
+    
+    switch (currentToken.type) {
+        case TokenType::LEFT_PAREN:
+            match(TokenType::LEFT_PAREN);
+            expression();
+            match(TokenType::RIGHT_PAREN);
+            break;
+            
+        case TokenType::IDENTIFIER:
+            lookAhead = scanner.getNextToken();
+            scanner.ungetToken();
+            if (lookAhead.type == TokenType::LEFT_PAREN) {
+                call();
+            } else {
+                idAssign();
             }
+            break;
+            
+        case TokenType::INTEGER:
+        case TokenType::FLOAT:
+            num();
+            break;
+            
+        default:
+            error("Invalid factor");
+            advance();
+            break;
+    }
+}
+
+void Parser::call() {
+    // call → ID ( args )
+    match(TokenType::IDENTIFIER);
+    match(TokenType::LEFT_PAREN);
+    args();
+    match(TokenType::RIGHT_PAREN);
+}
+
+void Parser::args() {
+    // args → arg-list | ε
+    if (currentToken.type != TokenType::RIGHT_PAREN) {
+        argList();
+    }
+}
+
+void Parser::argList() {
+    // arg-list → arg-list , expression | expression
+    expression();
+    while (currentToken.type == TokenType::COMMA) {
+        match(TokenType::COMMA);
+        expression();
+    }
+}
+
+void Parser::num() {
+    // num → INTEGER | FLOAT
+    if (currentToken.type == TokenType::INTEGER || currentToken.type == TokenType::FLOAT) {
+        advance();
+    } else {
+        error("Expected number");
+        advance();
+    }
+}
+
+void Parser::comment() {
+    // comment → /@ STR @/ | /^ STR
+    if (currentToken.type == TokenType::COMMENT_START) {
+        advance();
+        while (currentToken.type == TokenType::COMMENT_CONTENT) {
+            advance();
         }
-        
-        return program;
-    } catch (const ParseError&) {
-        return nullptr;
-    }
-}
-
-std::unique_ptr<ASTNode> Parser::parseStatement() {
-    try {
-        // Handle variable declarations
-        if (match(TokenType::INTEGER) || match(TokenType::SINTEGER) || 
-            match(TokenType::FLOAT) || match(TokenType::SFLOAT) ||
-            match(TokenType::STRING) || match(TokenType::CHARACTER)) {
-            return parseVariableDeclaration();
-        }
-        
-        // Handle other statements
-        if (match(TokenType::CONDITION)) {
-            return parseIfTrueStatement();
-        }
-        
-        if (match(TokenType::LOOP)) {
-            return parseRepeatWhenStatement();
-        }
-        
-        if (match(TokenType::RETURN)) {
-            return parseTurnbackStatement();
-        }
-        
-        if (match(TokenType::BREAK)) {
-            consume(TokenType::SEMICOLON, "Expected ';' after break");
-            return std::make_unique<OutLoopStmtNode>(previous().line, previous().column);
-        }
-        
-        if (match(TokenType::STRUCT)) {
-            return parseLoliDeclaration();
-        }
-        
-        if (match(TokenType::INCLUDE)) {
-            return parseIncludeStatement();
-        }
-        
-        // Expression statement
-        auto expr = parseExpression();
-        consume(TokenType::SEMICOLON, "Expected ';' after expression");
-        return std::make_unique<ExpressionStatementNode>(std::move(expr), previous().line, previous().column);
-    } catch (const ParseError&) {
-        synchronize();
-        return nullptr;
-    }
-}
-
-std::unique_ptr<ExpressionNode> Parser::parseExpression() {
-    return parseAssignment();
-}
-
-std::unique_ptr<ExpressionNode> Parser::parseAssignment() {
-    auto expr = parseOr();
-    
-    if (match(TokenType::EQUAL)) {
-        Token equals = previous();
-        auto value = parseAssignment();
-        
-        if (auto* varExpr = dynamic_cast<VariableNode*>(expr.get())) {
-            Token name = varExpr->name;
-            return std::make_unique<AssignmentNode>(name, std::move(value), 
-                                                  equals.line, equals.column);
-        }
-        
-        error(equals, "Invalid assignment target");
-    }
-    
-    return expr;
-}
-
-std::unique_ptr<ExpressionNode> Parser::parseOr() {
-    auto expr = parseAnd();
-    
-    while (match(TokenType::OR)) {
-        Token op = previous();
-        auto right = parseAnd();
-        expr = std::make_unique<BinaryExprNode>(op.type, std::move(expr), 
-                                              std::move(right), op.line, op.column);
-    }
-    
-    return expr;
-}
-
-std::unique_ptr<ExpressionNode> Parser::parseAnd() {
-    auto expr = parseEquality();
-    
-    while (match(TokenType::AND)) {
-        Token op = previous();
-        auto right = parseEquality();
-        expr = std::make_unique<BinaryExprNode>(op.type, std::move(expr), 
-                                              std::move(right), op.line, op.column);
-    }
-    
-    return expr;
-}
-
-std::unique_ptr<ExpressionNode> Parser::parseEquality() {
-    auto expr = parseComparison();
-    
-    while (match(TokenType::EQUAL) || match(TokenType::NOT_EQUAL)) {
-        Token op = previous();
-        auto right = parseComparison();
-        expr = std::make_unique<BinaryExprNode>(op.type, std::move(expr), 
-                                              std::move(right), op.line, op.column);
-    }
-    
-    return expr;
-}
-
-std::unique_ptr<ExpressionNode> Parser::parseComparison() {
-    auto expr = parseTerm();
-    
-    while (match(TokenType::GREATER) || match(TokenType::GREATER_EQUAL) ||
-           match(TokenType::LESS) || match(TokenType::LESS_EQUAL)) {
-        Token op = previous();
-        auto right = parseTerm();
-        expr = std::make_unique<BinaryExprNode>(op.type, std::move(expr), 
-                                              std::move(right), op.line, op.column);
-    }
-    
-    return expr;
-}
-
-std::unique_ptr<ExpressionNode> Parser::parseTerm() {
-    auto expr = parseFactor();
-    
-    while (match(TokenType::PLUS) || match(TokenType::MINUS)) {
-        Token op = previous();
-        auto right = parseFactor();
-        expr = std::make_unique<BinaryExprNode>(op.type, std::move(expr), 
-                                              std::move(right), op.line, op.column);
-    }
-    
-    return expr;
-}
-
-std::unique_ptr<ExpressionNode> Parser::parseFactor() {
-    auto expr = parseUnary();
-    
-    while (match(TokenType::MULTIPLY) || match(TokenType::DIVIDE)) {
-        Token op = previous();
-        auto right = parseUnary();
-        expr = std::make_unique<BinaryExprNode>(op.type, std::move(expr), 
-                                              std::move(right), op.line, op.column);
-    }
-    
-    return expr;
-}
-
-std::unique_ptr<ExpressionNode> Parser::parseUnary() {
-    if (match(TokenType::NOT) || match(TokenType::MINUS)) {
-        Token op = previous();
-        auto right = parseUnary();
-        return std::make_unique<UnaryExprNode>(op.type, std::move(right), 
-                                             op.line, op.column);
-    }
-    
-    return parsePrimary();
-}
-
-std::unique_ptr<ExpressionNode> Parser::parsePrimary() {
-    if (match(TokenType::CONSTANT)) {
-        Token token = previous();
-        return std::make_unique<LiteralNode>(token.value, token.type, token.line, token.column);
-    }
-    
-    if (match(TokenType::IDENTIFIER)) {
-        return std::make_unique<VariableNode>(previous());
-    }
-    
-    if (match(TokenType::LEFT_PAREN)) {
-        auto expr = parseExpression();
-        consume(TokenType::RIGHT_PAREN, "Expected ')' after expression");
-        return std::make_unique<GroupingNode>(std::move(expr), 
-                                            previous().line, previous().column);
-    }
-    
-    throw error(peek(), "Expected expression");
-}
-
-std::unique_ptr<ASTNode> Parser::parseIfTrueStatement() {
-    consume(TokenType::LEFT_PAREN, "Expected '(' after 'if_true'");
-    auto condition = parseExpression();
-    consume(TokenType::RIGHT_PAREN, "Expected ')' after condition");
-    
-    consume(TokenType::LEFT_BRACE, "Expected '{' before if_true body");
-    auto thenBranch = parseBlock();
-    
-    std::unique_ptr<ASTNode> elseBranch = nullptr;
-    if (match(TokenType::OTHERWISE)) {
-        consume(TokenType::LEFT_BRACE, "Expected '{' before otherwise body");
-        elseBranch = parseBlock();
-    }
-    
-    return std::make_unique<IfTrueStmtNode>(std::move(condition), std::move(thenBranch), std::move(elseBranch), previous().line, previous().column);
-}
-
-std::unique_ptr<ASTNode> Parser::parseRepeatWhenStatement() {
-    consume(TokenType::LEFT_PAREN, "Expected '(' after 'repeatwhen'");
-    auto condition = parseExpression();
-    consume(TokenType::RIGHT_PAREN, "Expected ')' after condition");
-    
-    consume(TokenType::LEFT_BRACE, "Expected '{' before repeatwhen body");
-    auto body = parseBlock();
-    
-    return std::make_unique<RepeatWhenStmtNode>(std::move(condition), std::move(body), previous().line, previous().column);
-}
-
-std::unique_ptr<ASTNode> Parser::parseTurnbackStatement() {
-    auto value = parseExpression();
-    consume(TokenType::SEMICOLON, "Expected ';' after turnback value");
-    return std::make_unique<TurnbackStmtNode>(std::move(value), previous().line, previous().column);
-}
-
-std::unique_ptr<ASTNode> Parser::parseLoliDeclaration() {
-    Token name = consume(TokenType::IDENTIFIER, "Expected loli name");
-    consume(TokenType::LEFT_BRACE, "Expected '{' before loli body");
-    
-    std::vector<std::pair<std::string, TokenType>> members;
-    while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
-        if (!isTypeToken(current.type)) {
-            throw error(current, "Expected type name");
-        }
-        Token type = advance();
-        Token field = consume(TokenType::IDENTIFIER, "Expected field name");
-        consume(TokenType::SEMICOLON, "Expected ';' after field declaration");
-        members.push_back({field.value, type.type});
-    }
-    
-    consume(TokenType::RIGHT_BRACE, "Expected '}' after loli body");
-    return std::make_unique<LoliDeclNode>(name.value, std::move(members), previous().line, previous().column);
-}
-
-std::unique_ptr<ASTNode> Parser::parseIncludeStatement() {
-    Token path = consume(TokenType::STRING, "Expected file path in quotes");
-    consume(TokenType::SEMICOLON, "Expected ';' after include statement");
-    return std::make_unique<IncludeStmtNode>(path.value, previous().line, previous().column);
-}
-
-std::unique_ptr<ASTNode> Parser::parseBlock() {
-    auto block = std::make_unique<BlockNode>(previous().line, previous().column);
-    
-    while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
-        auto stmt = parseStatement();
-        if (stmt) {
-            block->statements.push_back(std::move(stmt));
+        if (currentToken.type == TokenType::COMMENT_END) {
+            advance();
         }
     }
-    
-    consume(TokenType::RIGHT_BRACE, "Expected '}' after block");
-    return block;
 }
 
-std::unique_ptr<ASTNode> Parser::parseVariableDeclaration() {
-    Token type = previous();
-    Token name = consume(TokenType::IDENTIFIER, "Expected variable name");
-    
-    std::unique_ptr<ExpressionNode> initializer = nullptr;
-    if (match(TokenType::ASSIGN)) {
-        initializer = parseExpression();
+void Parser::includeCommand() {
+    // include_command → Include ( F_name.txt );
+    match(TokenType::INCLUDE);
+    match(TokenType::LEFT_PAREN);
+    if (currentToken.type == TokenType::STRING) {
+        advance();
+    } else {
+        error("Expected file name");
     }
-    
-    consume(TokenType::SEMICOLON, "Expected ';' after variable declaration");
-    return std::make_unique<VariableDeclNode>(name.value, type.type, std::move(initializer), name.line, name.column);
+    match(TokenType::RIGHT_PAREN);
+    match(TokenType::SEMICOLON);
+}
+
+bool Parser::hasError() const {
+    return errorCount > 0;
+}
+
+const std::vector<std::string>& Parser::getErrors() const {
+    return errors;
+}
+
+int Parser::getErrorCount() const {
+    return errorCount;
 } 

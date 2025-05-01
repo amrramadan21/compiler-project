@@ -249,73 +249,54 @@ public:
 
 // Parser Class
 class Parser {
-public:
-    Parser(const std::vector<Token>& tokens);
-    std::unique_ptr<ASTNode> parse();
-    bool hasError() const { return !errorMessage.empty(); }
-    const std::string& getError() const { return errorMessage; }
-    const std::vector<std::string>& getMatchedRules() const { return matchedRules; }
-
 private:
-    struct ParseError {};
-
-    // Token handling
-    Token previous() const;
-    Token advance();
-    Token peek() const;
-    bool match(TokenType type);
-    bool check(TokenType type) const;
-    Token consume(TokenType type, const std::string& message);
-    ParseError error(const Token& token, const std::string& message);
-    void synchronize();
-    bool isAtEnd() const;
-    bool checkNext(TokenType type) const;
-
-    // Statement parsing
-    std::unique_ptr<ASTNode> parseStatement();
-    std::unique_ptr<ASTNode> parseBlock();
-    std::unique_ptr<ASTNode> parseVariableDeclaration();
-    std::unique_ptr<ASTNode> parseIfStatement();
-    std::unique_ptr<ASTNode> parseWhileStatement();
-    std::unique_ptr<ASTNode> parseForStatement();
-    std::unique_ptr<ASTNode> parseFunctionDeclaration();
-    std::unique_ptr<ASTNode> parseIfTrueStatement();
-    std::unique_ptr<ASTNode> parseRepeatWhenStatement();
-    std::unique_ptr<ASTNode> parseTurnbackStatement();
-    std::unique_ptr<ASTNode> parseOutLoopStatement();
-    std::unique_ptr<ASTNode> parseLoliDeclaration();
-    std::unique_ptr<ASTNode> parseIncludeStatement();
-
-    // Expression parsing
-    std::unique_ptr<ExpressionNode> parseExpression();
-    std::unique_ptr<ExpressionNode> parseAssignment();
-    std::unique_ptr<ExpressionNode> parseOr();
-    std::unique_ptr<ExpressionNode> parseAnd();
-    std::unique_ptr<ExpressionNode> parseEquality();
-    std::unique_ptr<ExpressionNode> parseComparison();
-    std::unique_ptr<ExpressionNode> parseTerm();
-    std::unique_ptr<ExpressionNode> parseFactor();
-    std::unique_ptr<ExpressionNode> parseUnary();
-    std::unique_ptr<ExpressionNode> parsePrimary();
-
+    Scanner scanner;
+    Token currentToken;
+    std::vector<std::string> errors;
+    int errorCount;
+    
     // Helper methods
-    bool isUnaryOperator(TokenType type) const;
-    bool isBinaryOperator(TokenType type) const;
-    int getOperatorPrecedence(TokenType type) const;
-    std::string tokenToString(TokenType type) const;
-    bool isTypeToken(TokenType type) const;
-    bool isTypeSpecifier(TokenType type) const;
-    bool isRelop(TokenType type) const;
-    bool isAddop(TokenType type) const;
-    bool isMulop(TokenType type) const;
-    void reportError(const std::string& message);
-    void reportMatch(const std::string& rule);
-
-    // Member variables
-    std::vector<Token> tokens;
-    size_t currentIndex = 0;
-    Token current;
-    Token previousToken;
-    std::string errorMessage;
-    std::vector<std::string> matchedRules;
+    void advance();
+    void match(TokenType type);
+    void error(const std::string& message);
+    bool isTypeSpecifier(TokenType type);
+    bool isRelop(TokenType type);
+    
+    // Grammar rule parsing methods
+    void program();
+    void declarationList();
+    void declaration();
+    void varDeclaration();
+    void funDeclaration();
+    void typeSpecifier();
+    void params();
+    void paramList();
+    void param();
+    void compoundStmt();
+    void localDeclarations();
+    void statementList();
+    void statement();
+    void expressionStmt();
+    void selectionStmt();
+    void iterationStmt();
+    void jumpStmt();
+    void expression();
+    void idAssign();
+    void simpleExpression();
+    void additiveExpression();
+    void term();
+    void factor();
+    void call();
+    void args();
+    void argList();
+    void num();
+    void comment();
+    void includeCommand();
+    
+public:
+    explicit Parser(const std::string& source);
+    void parse();
+    bool hasError() const;
+    const std::vector<std::string>& getErrors() const;
+    int getErrorCount() const;
 }; 

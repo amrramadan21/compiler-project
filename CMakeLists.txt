@@ -1,10 +1,9 @@
 cmake_minimum_required(VERSION 3.10)
-project(CompilerProject)
+project(compiler)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Add source files
 set(SOURCES
@@ -22,11 +21,14 @@ set(HEADERS
 # Create executable
 add_executable(compiler ${SOURCES} ${HEADERS})
 
+# Add debug flags
+set(CMAKE_BUILD_TYPE Debug)
+
 # Set compiler flags
 if(MSVC)
     target_compile_options(compiler PRIVATE /W4)
 else()
-    target_compile_options(compiler PRIVATE -Wall -Wextra -pedantic)
+    target_compile_options(compiler PRIVATE -Wall -Wextra)
 endif()
 
 # Set include directories

@@ -77,7 +77,7 @@ CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO:STRING=/debug /INCREMENTAL
 CMAKE_FIND_PACKAGE_REDIRECTS_DIR:STATIC=C:/Users/amrra/Desktop/Projects/compilers Project/compiler from scratch/build/CMakeFiles/pkgRedirects
 
 //Install path prefix, prepended onto install directories.
-CMAKE_INSTALL_PREFIX:PATH=C:/Program Files (x86)/CompilerProject
+CMAKE_INSTALL_PREFIX:PATH=C:/Program Files (x86)/compiler
 
 //Path to a program.
 CMAKE_LINKER:FILEPATH=C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/VC/Tools/MSVC/14.43.34808/bin/Hostx64/x64/link.exe
@@ -112,7 +112,7 @@ CMAKE_PROJECT_DESCRIPTION:STATIC=
 CMAKE_PROJECT_HOMEPAGE_URL:STATIC=
 
 //Value Computed by CMake
-CMAKE_PROJECT_NAME:STATIC=CompilerProject
+CMAKE_PROJECT_NAME:STATIC=compiler
 
 //RC compiler
 CMAKE_RC_COMPILER:FILEPATH=rc
@@ -186,13 +186,13 @@ CMAKE_STATIC_LINKER_FLAGS_RELWITHDEBINFO:STRING=
 CMAKE_VERBOSE_MAKEFILE:BOOL=FALSE
 
 //Value Computed by CMake
-CompilerProject_BINARY_DIR:STATIC=C:/Users/amrra/Desktop/Projects/compilers Project/compiler from scratch/build
+compiler_BINARY_DIR:STATIC=C:/Users/amrra/Desktop/Projects/compilers Project/compiler from scratch/build
 
 //Value Computed by CMake
-CompilerProject_IS_TOP_LEVEL:STATIC=ON
+compiler_IS_TOP_LEVEL:STATIC=ON
 
 //Value Computed by CMake
-CompilerProject_SOURCE_DIR:STATIC=C:/Users/amrra/Desktop/Projects/compilers Project/compiler from scratch
+compiler_SOURCE_DIR:STATIC=C:/Users/amrra/Desktop/Projects/compilers Project/compiler from scratch
 
 
 ########################

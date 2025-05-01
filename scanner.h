@@ -26,8 +26,6 @@ enum class TokenType {
     STRUCT,         // Loli
     INCLUDE,        // Include
     IDENTIFIER,     // Variable names
-    DOT,            // Member access
-    ARROW,          // Pointer access
     
     // Operators
     PLUS,           // +
@@ -68,7 +66,7 @@ enum class TokenType {
     // Special
     END_OF_FILE,    // End of file
     ERROR,          // Error token
-    UNKNOWN        // Unknown token type
+    TYPE           // For type specifiers
 };
 
 struct Token {
@@ -77,7 +75,7 @@ struct Token {
     int line;
     int column;
     
-    Token() : type(TokenType::UNKNOWN), value(""), line(0), column(0) {}
+    Token() : type(TokenType::ERROR), value(""), line(0), column(0) {}
     Token(TokenType t, const std::string& v, int l, int c)
         : type(t), value(v), line(l), column(c) {}
 };
@@ -94,6 +92,7 @@ private:
     std::vector<int> lineStack;
     std::vector<int> columnStack;
     std::vector<std::string> errors;
+    std::vector<Token> tokenBuffer;  // Buffer for ungetting tokens
     
     char advance();
     char peek();
@@ -105,12 +104,14 @@ private:
     
     void skipWhitespace();
     void skipComment();
+    Token scanComment();
     Token scanIdentifier();
     Token scanNumber();
     Token scanString();
     Token scanCharacter();
     Token scanOperator();
     void handleInclude(const std::string& filename);
+    void processIncludeDirective();
     void error(const std::string& message, int line, int column);
     
 public:
@@ -118,6 +119,7 @@ public:
     ~Scanner();
     
     Token getNextToken();
+    void ungetToken();  // Add token back to the buffer
     bool hasError() const;
     const std::vector<std::string>& getErrors() const;
     size_t getErrorCount() const;

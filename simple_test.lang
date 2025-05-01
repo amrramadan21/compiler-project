@@ -1,0 +1,8 @@
+Imw x;
+SIMw y;
+
+NOReturn main() {
+    Series message;
+    message = "Hello, World!";
+    Turnback;
+} 
